@@ -1,0 +1,16 @@
+{
+  "name": "geolocation-report-miner",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://andreab91@bitbucket.org/andreab91/geolocation-report-miner.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/andreab91/geolocation-report-miner#readme"
+}
