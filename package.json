@@ -12,5 +12,8 @@
   },
   "author": "",
   "license": "ISC",
-  "homepage": "https://bitbucket.org/andreab91/geolocation-report-miner#readme"
+  "homepage": "https://bitbucket.org/andreab91/geolocation-report-miner#readme",
+  "dependencies": {
+    "mongodb": "^3.0.6"
+  }
 }
