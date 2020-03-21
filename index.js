@@ -27,7 +27,7 @@ var p = {
         Date:-1,
         CreatedAt: -1
     },
-    limit: 200,
+    limit: 21,
     skip: 0
 };
 
@@ -36,41 +36,34 @@ var client;
 var result_to_array_callback = function (err, result){
     if (err) throw err;
 
-    //var promise_array = [];
+    var promise_array = [];
     
     for (let obj of result) {
-        //promise_array.push(locate(obj));
-        locate(obj)
-            .then((localized_report)=>{
+        console.log("locating: " + obj._id);
+        promise_array.push(locate(obj));
+    }
 
-                console.log(JSON.stringify(localized_report, null,2));
-                
-                client.db('MyDatabase').collection(collectionName)
+    Promise.all(promise_array).then((localized_reports)=>{
+        
+        for(let localized_report of localized_reports){
+            client.db('MyDatabase').collection(collectionName)
                 .updateOne({"_id" : localized_report._id},
                     {$set : { geometry : localized_report.geometry }},
                     function(err, res){
                         if (err) throw err;
                         console.log("1 document updated");
-                    }
-                );
-                
-            })
-            .catch((err)=>{
-                throw err;
             });
-    }
+        }
+        
+        client.close();
+    })
+    .catch((err)=>{
+        console.log(err);
+        throw err;
+        client.close();
+    });
 
-    var counter = 0;
-
-    /*
-    Promise.all(promise_array)
-        .then(()=>{})
-        .catch((err)=>{
-            throw err;
-        });
-    */
-
-    //client.close();
+    
 };
 
 MongoClient.connect(url, function (err, c) {
@@ -88,7 +81,7 @@ MongoClient.connect(url, function (err, c) {
 
 function locate(report){
     return new Promise((resolve, reject) => {
-        var opencageURL = "https://api.opencagedata.com/geocode/v1/json?key=0b5d57f426574c5f94b54494ce3eec45&q=TripName,Region&pretty=0&no_annotations=1";
+        var opencageURL = "https://api.opencagedata.com/geocode/v1/json?key=efb086e9e0884dc7a05179eb453bf2ab&q=TripName,Region&pretty=0&no_annotations=1";
 
         opencageURL = opencageURL.replace("TripName", report.SearchTripName);
         opencageURL = opencageURL.replace("Region", report.Region);
@@ -105,20 +98,28 @@ function locate(report){
             });
 
             response.on('end', () => {
+                console.log("\tCALLED: " + opencageURL);
+
                 //create the object from the html page
                 var location_results = JSON.parse(body);
-                if(location_results.total_results > 0 && location_results.results[0].geometry.lat && location_results.results[0].geometry.lng){
-                    report["geometry"] = {
-                        type: "Point",
-                        coordinates: [
-                            location_results.results[0].geometry.lat,
-                            location_results.results[0].geometry.lng
-                        ]
-                    };
-                    resolve(report);
+                if(location_results.status.code == 402){
+                    if(location_results.total_results > 0 && location_results.results[0].geometry.lat && location_results.results[0].geometry.lng){
+                        report["geometry"] = {
+                            type: "Point",
+                            coordinates: [
+                                location_results.results[0].geometry.lat,
+                                location_results.results[0].geometry.lng
+                            ]
+                        };
+                        resolve(report);
+                    }
+                    else{
+                        console.log("something wrong with report _id: " + report._id +" while geolocalizing");
+                        return;
+                    }
                 }
                 else{
-                    reject("something wrong with report _id: " + report._id +" while geolocalizing");
+                    reject("open cage returned 402: quota exceeded");
                 }
             });
         });
