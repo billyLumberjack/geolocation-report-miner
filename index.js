@@ -27,7 +27,7 @@ var p = {
         Date:-1,
         CreatedAt: -1
     },
-    limit: 200,
+    limit: 1,
     skip: 0
 };
 
@@ -88,7 +88,7 @@ MongoClient.connect(url, function (err, c) {
 
 function locate(report){
     return new Promise((resolve, reject) => {
-        var opencageURL = "https://api.opencagedata.com/geocode/v1/json?key=0b5d57f426574c5f94b54494ce3eec45&q=TripName,Region&pretty=0&no_annotations=1";
+        var opencageURL = "https://api.opencagedata.com/geocode/v1/json?key=efb086e9e0884dc7a05179eb453bf2ab&q=TripName,Region&pretty=0&no_annotations=1";
 
         opencageURL = opencageURL.replace("TripName", report.SearchTripName);
         opencageURL = opencageURL.replace("Region", report.Region);
