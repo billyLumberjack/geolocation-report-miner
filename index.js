@@ -5,9 +5,11 @@ process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 // needed because of winzozz err
 
 var username = 'root';
 var password = 'root';
-var shards = ['cluster0-shard-00-00-shxrr.mongodb.net:27017',
+var shards = [
+    'cluster0-shard-00-00-shxrr.mongodb.net:27017',
     'cluster0-shard-00-01-shxrr.mongodb.net:27017',
-    'cluster0-shard-00-02-shxrr.mongodb.net:27017'];
+    'cluster0-shard-00-02-shxrr.mongodb.net:27017'
+    ];
 var database = 'MyDatabase';
 
 var mongoDbConnectionString = 'mongodb://' + username + ':' + password + '@' + shards.join(',') + '/' + database + '?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin';
@@ -33,6 +35,22 @@ var p = {
     skip: 0
 };
 
+var updateInMongoDb = function(localizedReport , mongoDbClient , isLastReport){
+    mongoDbClient.db('MyDatabase').collection(collectionName)
+        .updateOne(
+            {"_id" : localizedReport._id},
+            {$set : { geometry : localizedReport.geometry }},
+            function(err, res){
+                if (err) throw err;
+                console.log(localizedReport._id + " succesfully updated");
+            }
+        );
+
+    if(isLastReport){
+        mongoDbClient.close();
+    }
+}
+
 MongoClient.connect(mongoDbConnectionString, function (error, currentClient) {
 
     if (error) throw error;
@@ -53,31 +71,22 @@ MongoClient.connect(mongoDbConnectionString, function (error, currentClient) {
 
             console.log("Got " + locatePromises.length + " promises");
 
-            var geolocalizedReport = locatePromises.map((locatePromise) => {
+            var updatedReports = 0
+
+            var geolocalizedReport = locatePromises.map((locatePromise , currentIndex , promisesArray) => {
+                updatedReports++
+
+                var isLastReport = updatedReports === promisesArray.length
+
                 locatePromise
-                    .then((localizedReport) => {return localizedReport})
+                    .then(localizedReport => updateInMongoDb(localizedReport , currentClient , isLastReport))
                     .catch((error) => {throw error})
             });
-
-            console.log("Got " + geolocalizedReport.length + " gelocalized reports");
-            console.log(JSON.stringify(geolocalizedReport));
-
-            geolocalizedReport.foreach((localizedReport) => {
-               client.db('MyDatabase').collection(collectionName)
-                    .updateOne(
-                        {"_id" : localized_report._id},
-                        {$set : { geometry : localized_report.geometry }},
-                        function(err, res){
-                            if (err) throw err;
-                            console.log(localized_report._id + " succesfully updated");
-                        }
-                    );
-            });
-
         });
 
-    currentClient.close();
-        
+
+
+
 });
 
 function locate(report){
