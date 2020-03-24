@@ -80,7 +80,7 @@ MongoClient.connect(mongoDbConnectionString, function (error, currentClient) {
 
 function locate(report){
     return new Promise((resolve, reject) => {
-        var opencageURL = "https://api.opencagedata.com/geocode/v1/json?key=efb086e9e0884dc7a05179eb453bf2ab&q=TripName,Region&pretty=0&no_annotations=1"
+        var opencageURL = "https://api.opencagedata.com/geocode/v1/json?key=efb086e9e0884dc7a05179eb453bf2ab&q=TripName,Region&pretty=0&no_annotations=1&min_confidence=2"
             .replace("TripName", report.SearchTripName)
             .replace("Region", report.Region);
 
