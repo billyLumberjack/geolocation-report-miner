@@ -35,7 +35,7 @@ const queryParameters = {
         Date: -1,
         CreatedAt: -1
     },
-    limit: 3,
+    limit: 300,
     skip: 0
 };
 
@@ -120,18 +120,18 @@ function locate(report) {
                         }
                         else {
                             console.log("Found result but does not have coordinates for report: " + report._id);
-                            resolve(undefined);
+                            resolve(report);
                         }
                     }
                     else {
                         console.log("None of the results for report: " + report._id + " fit the categories");
-                        resolve(undefined);
+                        resolve(report);
                     }
 
                 }
                 else {
                     console.log("no results for report with _id: " + report._id + " while geolocalizing");
-                    resolve(undefined);
+                    resolve(report);
                 }
 
             });
@@ -141,11 +141,13 @@ function locate(report) {
 
 }
 
-var updateInMongoDbAsQueue = function(reportsToLocalizeArray, mongoClient, updatedReportsNumber, totalReportsToUpdate){
+var updateInMongoDbAsQueue = function(reportsToLocalizeArray, reportsNotLocalized, mongoClient, updatedReportsNumber, totalReportsToUpdate){
 
     if(reportsToLocalizeArray.length == 0){
 
         console.log(`\nUpdated ${updatedReportsNumber} reports on ${totalReportsToUpdate}\n`);
+
+        console.log(JSON.stringify(reportsNotLocalized, null, 2));
 
         mongoClient.close();
         return;
@@ -153,11 +155,16 @@ var updateInMongoDbAsQueue = function(reportsToLocalizeArray, mongoClient, updat
 
     locate(reportsToLocalizeArray[0])
         .then((localizedReport) => {
-            if(localizedReport){
+            
+            if(localizedReport.geometry){
                 updateInMongoDb(localizedReport, mongoClient);
                 updatedReportsNumber++;
             }
-            return updateInMongoDbAsQueue(reportsToLocalizeArray.slice(1), mongoClient, updatedReportsNumber, totalReportsToUpdate);
+            else{
+                reportsNotLocalized.push(localizedReport);
+            }
+
+            return updateInMongoDbAsQueue(reportsToLocalizeArray.slice(1), reportsNotLocalized, mongoClient, updatedReportsNumber, totalReportsToUpdate);
         })
         .catch((error) => {
             mongoClient.close();
@@ -197,7 +204,7 @@ MongoClient.connect(mongoDbConnectionString, function (error, currentClient) {
 
             console.log(`Got ${reportsToLocalizeArray.length} reports to localize`);
 
-            updateInMongoDbAsQueue(reportsToLocalizeArray, currentClient, 0, reportsToLocalizeArray.length);
+            updateInMongoDbAsQueue(reportsToLocalizeArray, [], currentClient, 0, reportsToLocalizeArray.length);
 
         });
 });
