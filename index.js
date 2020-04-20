@@ -1,20 +1,37 @@
 const MongoClient = require('mongodb').MongoClient;
 const https = require('https');
+const MyPromise = require("bluebird");
+
+const openCageKeys = {
+    accountKey : "efb086e9e0884dc7a05179eb453bf2ab",
+    test : {
+        always200 : "6d0e711d72d74daeb2b0bfd2a5cdfdba",
+        always402 : "4372eff77b8343cebfc843eb4da4ddc4",
+        always403 : "2e10e5e828262eb243ec0b54681d699a",
+        always403 : "6c79ee8e1ca44ad58ad1fc493ba9542f",
+        always429 : "d6d0f0065f4348a4bdfe4587ba02714b"
+    }
+};
+
+var updatedReportsNumber = 0;
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 // needed because of winzozz error
 
 
-function makeConnectionString(username , password , shards , database){
+function makeConnectionString(username, password, shards, database) {
     return 'mongodb://' + username + ':' + password + '@' + shards.join(',') + '/' + database + '?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin';
 }
 
-function updateInMongoDb(localizedReport , mongoDbClient){
+function updateInMongoDb(localizedReport, mongoDbClient) {
     mongoDbClient.db(database).collection(collectionName)
         .updateOne(
-            {"_id" : localizedReport._id},
-            {$set : { geometry : localizedReport.geometry }},
-            function(err, res){
+            { "_id": localizedReport._id },
+            { $set: { geometry: localizedReport.geometry } },
+            function (err, res) {
+                
                 if (err) throw err;
+
+                updatedReportsNumber++;
                 console.log(localizedReport._id + " succesfully updated");
             }
         );
@@ -25,7 +42,7 @@ var collectionName = 'test-report-collection';
 var mongoDbConnectionString = makeConnectionString(
     'root',
     'root',
-     [
+    [
         'cluster0-shard-00-00-shxrr.mongodb.net:27017',
         'cluster0-shard-00-01-shxrr.mongodb.net:27017',
         'cluster0-shard-00-02-shxrr.mongodb.net:27017'
@@ -39,14 +56,14 @@ MongoClient.connect(mongoDbConnectionString, function (error, currentClient) {
 
     var queryParameters = {
         filter: {
-            geometry : {$exists:false}
+            geometry: { $exists: false }
         },
         project: {},
         sort: {
-            Date:-1,
+            Date: -1,
             CreatedAt: -1
         },
-        limit: 2000,
+        limit: 60,
         skip: 0
     };
 
@@ -54,35 +71,74 @@ MongoClient.connect(mongoDbConnectionString, function (error, currentClient) {
         .sort(queryParameters.sort)
         .skip(queryParameters.skip)
         .limit(queryParameters.limit)
-        .toArray(function(error , reportsToLocalizeArray){
+        .toArray(function (error, reportsToLocalizeArray) {
 
             if (error) throw error;
 
-            console.log(reportsToLocalizeArray.length  + " reports to localize");
+            console.log(reportsToLocalizeArray.length + " reports to localize");
 
-            var locatePromises = reportsToLocalizeArray.map((reportToGeolocalize) => {
-                return locate(reportToGeolocalize)
+            reportsToLocalizeArray = reportsToLocalizeArray
+                .filter((reportWithTitleTokensToCheck) => {
+                    let maxTokensThreshold = 10;
+                    let titleTokensNumber = reportWithTitleTokensToCheck.TripName.split(/[^a-zA-Z0-9]+/g).filter(token => token).length;
+
+                    let proceedWithThisReport = titleTokensNumber < maxTokensThreshold;
+
+                    if (!proceedWithThisReport) {
+                        console.log(`Removed report with _id ${reportWithTitleTokensToCheck._id} because trip name (${reportWithTitleTokensToCheck.TripName}) contains to many tokens`)
+                    }
+
+                    return proceedWithThisReport;
             });
 
-            console.log("Got " + locatePromises.length + " promises");
+            console.log("Got " + reportsToLocalizeArray.length + " reports to localize");
 
-            Promise.all(locatePromises).then(function(geolocalizedReportArray){
-                geolocalizedReportArray
-                    .filter((gelocalizedReport) => {return gelocalizedReport != undefined})
-                    .forEach(gelocalizedReport => updateInMongoDb(gelocalizedReport , currentClient))
-            })
-            .then(() => {
-                currentClient.close();
-            })
-            .catch((error) => {throw error});
+            var myRecursiveFun = function(reportsToLocalizeArray){
+
+                if(reportsToLocalizeArray.length == 0){
+
+                    console.log(`Updated ${updatedReportsNumber} reports on ${queryParameters.limit}`);
+
+                    currentClient.close();
+                    return;
+                }
+
+                locate(reportsToLocalizeArray[0])
+                    .then((localizedReport) => {
+                        if(localizedReport){
+                            updateInMongoDb(localizedReport, currentClient);
+                        }
+                        return myRecursiveFun(reportsToLocalizeArray.slice(1));
+                    })
+                    .catch((error) => {
+                        currentClient.close();
+                        console.error(`\n${error.message}\n`);
+                        return;
+                    });
+            };
+
+            myRecursiveFun(reportsToLocalizeArray);
+
         });
 });
 
-function locate(report){
-    return new Promise((resolve, reject) => {
-        var opencageURL = "https://api.opencagedata.com/geocode/v1/json?key=efb086e9e0884dc7a05179eb453bf2ab&q=TripName,Region&pretty=0&no_annotations=1&min_confidence=2"
-            .replace("TripName", report.SearchTripName)
-            .replace("Region", report.Region);
+function getFirstLocationResultFittingCategories(locationResults) {
+    var locationResultsFittingCategories = locationResults.filter((locationResult) => {
+        return locationResult.components._category == "natural/water" || locationResult.components._category == "outdoors/recreation";
+    });
+
+    if (locationResultsFittingCategories.length > 0) {
+        return locationResultsFittingCategories[0];
+    }
+    else {
+        return undefined;
+    }
+}
+
+function locate(report) {
+    return new MyPromise((resolve, reject) => {
+
+        var opencageURL = `https://api.opencagedata.com/geocode/v1/json?key=${openCageKeys.accountKey}&q=${report.TripName.replace(/[^a-zA-Z0-9]+/g, " ")}&pretty=0&no_annotations=1&min_confidence=2`;
 
         opencageURL = encodeURI(opencageURL);
 
@@ -101,22 +157,41 @@ function locate(report){
                 //create the object from the html page
                 var location_results = JSON.parse(body);
 
-                if(location_results.status.code == 402){
-                    reject("open cage returned 402: quota exceeded");
+                if (location_results.status.code != 200){
+                    reject(new Error("Opencage returned error " + location_results.status.code +" : "+ location_results.status.message));
                 }
-                else if(location_results.total_results > 0 && location_results.results[0].geometry.lat && location_results.results[0].geometry.lng){
-                    report["geometry"] = {
-                        type: "Point",
-                        coordinates: [
-                            location_results.results[0].geometry.lat,
-                            location_results.results[0].geometry.lng
-                        ]
-                    };
-                    console.log("Succesfully added coordinates for report " + report["_id"]);
-                    resolve(report);
+                else if (location_results.total_results > 0) {
+
+                    console.log("Found some result for report " + report["_id"]);
+
+                    let locationResult = getFirstLocationResultFittingCategories(location_results.results);
+
+                    if (locationResult) {
+
+                        if (locationResult.geometry.lat && locationResult.geometry.lng) {
+                            report["geometry"] = {
+                                type: "Point",
+                                coordinates: [
+                                    locationResult.geometry.lat,
+                                    locationResult.geometry.lng
+                                ]
+                            };
+                            console.log("Succesfully added coordinates for report " + report["_id"]);
+                            resolve(report);
+                        }
+                        else {
+                            console.log("Found result but does not have coordinates for report: " + report._id);
+                            resolve(undefined);
+                        }
+                    }
+                    else {
+                        console.log("None of the results for report: " + report._id + " fit the categories");
+                        resolve(undefined);
+                    }
+
                 }
-                else{
-                    console.log("something wrong with report _id: " + report._id +" while geolocalizing");
+                else {
+                    console.log("no results for report with _id: " + report._id + " while geolocalizing");
                     resolve(undefined);
                 }
 
