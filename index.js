@@ -2,6 +2,8 @@ const MongoClient = require('mongodb').MongoClient;
 const https = require('https');
 const MyPromise = require("bluebird");
 
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 // needed because of winzozz error
+
 const openCageKeys = {
     accountKey : "efb086e9e0884dc7a05179eb453bf2ab",
     test : {
@@ -12,34 +14,9 @@ const openCageKeys = {
         always429 : "d6d0f0065f4348a4bdfe4587ba02714b"
     }
 };
-
-var updatedReportsNumber = 0;
-
-process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 // needed because of winzozz error
-
-
-function makeConnectionString(username, password, shards, database) {
-    return 'mongodb://' + username + ':' + password + '@' + shards.join(',') + '/' + database + '?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin';
-}
-
-function updateInMongoDb(localizedReport, mongoDbClient) {
-    mongoDbClient.db(database).collection(collectionName)
-        .updateOne(
-            { "_id": localizedReport._id },
-            { $set: { geometry: localizedReport.geometry } },
-            function (err, res) {
-                
-                if (err) throw err;
-
-                updatedReportsNumber++;
-                console.log(localizedReport._id + " succesfully updated");
-            }
-        );
-}
-
-var database = 'MyDatabase';
-var collectionName = 'test-report-collection';
-var mongoDbConnectionString = makeConnectionString(
+const database = 'MyDatabase';
+const collectionName = 'test-report-collection';
+const mongoDbConnectionString = makeConnectionString(
     'root',
     'root',
     [
@@ -49,78 +26,36 @@ var mongoDbConnectionString = makeConnectionString(
     ],
     database
 );
+const queryParameters = {
+    filter: {
+        geometry: { $exists: false }
+    },
+    project: {},
+    sort: {
+        Date: -1,
+        CreatedAt: -1
+    },
+    limit: 3,
+    skip: 0
+};
 
-MongoClient.connect(mongoDbConnectionString, function (error, currentClient) {
+function makeConnectionString(username, password, shards, database) {
+    return `mongodb://${username}:${password}@${shards.join(',')}/${database}?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin`;
+}
 
-    if (error) throw error;
-
-    var queryParameters = {
-        filter: {
-            geometry: { $exists: false }
-        },
-        project: {},
-        sort: {
-            Date: -1,
-            CreatedAt: -1
-        },
-        limit: 60,
-        skip: 0
-    };
-
-    currentClient.db(database).collection(collectionName).find(queryParameters.filter, queryParameters.project)
-        .sort(queryParameters.sort)
-        .skip(queryParameters.skip)
-        .limit(queryParameters.limit)
-        .toArray(function (error, reportsToLocalizeArray) {
-
-            if (error) throw error;
-
-            console.log(reportsToLocalizeArray.length + " reports to localize");
-
-            reportsToLocalizeArray = reportsToLocalizeArray
-                .filter((reportWithTitleTokensToCheck) => {
-                    let maxTokensThreshold = 10;
-                    let titleTokensNumber = reportWithTitleTokensToCheck.TripName.split(/[^a-zA-Z0-9]+/g).filter(token => token).length;
-
-                    let proceedWithThisReport = titleTokensNumber < maxTokensThreshold;
-
-                    if (!proceedWithThisReport) {
-                        console.log(`Removed report with _id ${reportWithTitleTokensToCheck._id} because trip name (${reportWithTitleTokensToCheck.TripName}) contains to many tokens`)
-                    }
-
-                    return proceedWithThisReport;
-            });
-
-            console.log("Got " + reportsToLocalizeArray.length + " reports to localize");
-
-            var myRecursiveFun = function(reportsToLocalizeArray){
-
-                if(reportsToLocalizeArray.length == 0){
-
-                    console.log(`Updated ${updatedReportsNumber} reports on ${queryParameters.limit}`);
-
-                    currentClient.close();
-                    return;
-                }
-
-                locate(reportsToLocalizeArray[0])
-                    .then((localizedReport) => {
-                        if(localizedReport){
-                            updateInMongoDb(localizedReport, currentClient);
-                        }
-                        return myRecursiveFun(reportsToLocalizeArray.slice(1));
-                    })
-                    .catch((error) => {
-                        currentClient.close();
-                        console.error(`\n${error.message}\n`);
-                        return;
-                    });
-            };
-
-            myRecursiveFun(reportsToLocalizeArray);
-
-        });
-});
+function updateInMongoDb(localizedReport, mongoDbClient) {
+//    mongoDbClient.db(database).collection(collectionName)
+//        .updateOne(
+//            { "_id": localizedReport._id },
+//            { $set: { geometry: localizedReport.geometry } },
+//            function (err, res) {
+//                
+//                if (err) throw err;
+//
+//                console.log("${localizedReport._id} succesfully updated");
+//            }
+//        );
+}
 
 function getFirstLocationResultFittingCategories(locationResults) {
     var locationResultsFittingCategories = locationResults.filter((locationResult) => {
@@ -138,7 +73,9 @@ function getFirstLocationResultFittingCategories(locationResults) {
 function locate(report) {
     return new MyPromise((resolve, reject) => {
 
-        var opencageURL = `https://api.opencagedata.com/geocode/v1/json?key=${openCageKeys.accountKey}&q=${report.TripName.replace(/[^a-zA-Z0-9]+/g, " ")}&pretty=0&no_annotations=1&min_confidence=2`;
+        report["extractedToponym"] = report.TripName.replace(/[^a-zA-Z0-9]+/g, " ");
+
+        var opencageURL = `https://api.opencagedata.com/geocode/v1/json?key=${openCageKeys.accountKey}&q=${report.extractedToponym}&pretty=0&no_annotations=1&min_confidence=2`;
 
         opencageURL = encodeURI(opencageURL);
 
@@ -158,7 +95,9 @@ function locate(report) {
                 var location_results = JSON.parse(body);
 
                 if (location_results.status.code != 200){
-                    reject(new Error("Opencage returned error " + location_results.status.code +" : "+ location_results.status.message));
+                    reject(
+                        new Error("Opencage returned error " + location_results.status.code +" : "+ location_results.status.message)
+                        );
                 }
                 else if (location_results.total_results > 0) {
 
@@ -201,3 +140,64 @@ function locate(report) {
 
 
 }
+
+var updateInMongoDbAsQueue = function(reportsToLocalizeArray, mongoClient, updatedReportsNumber, totalReportsToUpdate){
+
+    if(reportsToLocalizeArray.length == 0){
+
+        console.log(`\nUpdated ${updatedReportsNumber} reports on ${totalReportsToUpdate}\n`);
+
+        mongoClient.close();
+        return;
+    }
+
+    locate(reportsToLocalizeArray[0])
+        .then((localizedReport) => {
+            if(localizedReport){
+                updateInMongoDb(localizedReport, mongoClient);
+                updatedReportsNumber++;
+            }
+            return updateInMongoDbAsQueue(reportsToLocalizeArray.slice(1), mongoClient, updatedReportsNumber, totalReportsToUpdate);
+        })
+        .catch((error) => {
+            mongoClient.close();
+            console.error(`\n${error.message}\n`);
+            return;
+        });
+};     
+
+var areReportTokensLessThan = function(tokensThreshold, reportWithTitleTokensToCheck){
+    let titleTokensNumber = reportWithTitleTokensToCheck.TripName.split(/[^a-zA-Z0-9]+/g).filter(token => token).length;
+
+    let proceedWithThisReport = titleTokensNumber < tokensThreshold;
+
+    if (!proceedWithThisReport) {
+        console.log(`Removed report with _id ${reportWithTitleTokensToCheck._id} because trip name (${reportWithTitleTokensToCheck.TripName}) contains to many tokens`)
+    }
+
+    return proceedWithThisReport;
+}
+
+MongoClient.connect(mongoDbConnectionString, function (error, currentClient) {
+
+    if (error) throw error;
+
+    currentClient.db(database).collection(collectionName).find(queryParameters.filter, queryParameters.project)
+        .sort(queryParameters.sort)
+        .skip(queryParameters.skip)
+        .limit(queryParameters.limit)
+        .toArray(function (error, reportsToLocalizeArray) {
+
+            if (error) throw error;
+
+            console.log(reportsToLocalizeArray.length + " reports to localize");
+
+            reportsToLocalizeArray = reportsToLocalizeArray
+                .filter((reportToCkeck) => areReportTokensLessThan(10, reportToCkeck));
+
+            console.log(`Got ${reportsToLocalizeArray.length} reports to localize`);
+
+            updateInMongoDbAsQueue(reportsToLocalizeArray, currentClient, 0, reportsToLocalizeArray.length);
+
+        });
+});
