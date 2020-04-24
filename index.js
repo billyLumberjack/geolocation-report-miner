@@ -1,6 +1,7 @@
 const MongoClient = require('mongodb').MongoClient;
 const https = require('https');
 const MyPromise = require("bluebird");
+const childProcessLib = require("child_process");
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 // needed because of winzozz error
 
@@ -15,7 +16,7 @@ const openCageKeys = {
     }
 };
 const database = 'MyDatabase';
-const collectionName = 'test-report-collection';
+const collectionName = 'production-report-collection';
 const mongoDbConnectionString = makeConnectionString(
     'root',
     'root',
@@ -35,31 +36,41 @@ const queryParameters = {
         Date: -1,
         CreatedAt: -1
     },
-    limit: 300,
+    limit: 100,
     skip: 0
 };
+
+function refineTitle(titleToRefine){
+    //var process = spawn('python3',["../nltk_experiment/get_toponym.py", titleToRefine]);
+    return childProcessLib.spawnSync('python3',["../nltk_experiment/get_toponym.py", titleToRefine], {cwd : "../nltk_experiment/", shell: true}).stdout.toString();
+    //return new Promise((resolve, reject) =>{
+    //    process.stdout.on("data", data =>{
+    //        resolve(data.toString()); // <------------ by default converts to utf-8
+    //    })
+    //})
+}
 
 function makeConnectionString(username, password, shards, database) {
     return `mongodb://${username}:${password}@${shards.join(',')}/${database}?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin`;
 }
 
 function updateInMongoDb(localizedReport, mongoDbClient) {
-//    mongoDbClient.db(database).collection(collectionName)
-//        .updateOne(
-//            { "_id": localizedReport._id },
-//            { $set: { geometry: localizedReport.geometry } },
-//            function (err, res) {
-//                
-//                if (err) throw err;
-//
-//                console.log("${localizedReport._id} succesfully updated");
-//            }
-//        );
+    mongoDbClient.db(database).collection(collectionName)
+        .updateOne(
+            { "_id": localizedReport._id },
+            { $set: { geometry: localizedReport.geometry } },
+            function (err, res) {
+                
+                if (err) throw err;
+
+                console.log("${localizedReport._id} succesfully updated");
+            }
+        );
 }
 
 function getFirstLocationResultFittingCategories(locationResults) {
     var locationResultsFittingCategories = locationResults.filter((locationResult) => {
-        return locationResult.components._category == "natural/water" || locationResult.components._category == "outdoors/recreation";
+        return locationResult.components._category == "natural/water" || locationResult.components._category == "outdoors/recreation" || locationResult.components._category == "travel/tourism";
     });
 
     if (locationResultsFittingCategories.length > 0) {
@@ -73,9 +84,7 @@ function getFirstLocationResultFittingCategories(locationResults) {
 function locate(report) {
     return new MyPromise((resolve, reject) => {
 
-        report["extractedToponym"] = report.TripName.replace(/[^a-zA-Z0-9]+/g, " ");
-
-        var opencageURL = `https://api.opencagedata.com/geocode/v1/json?key=${openCageKeys.accountKey}&q=${report.extractedToponym}&pretty=0&no_annotations=1&min_confidence=2`;
+        var opencageURL = `https://api.opencagedata.com/geocode/v1/json?key=${openCageKeys.accountKey}&q=${report.extractedToponym},${report.Region}&pretty=0&no_annotations=1&min_confidence=2`;
 
         opencageURL = encodeURI(opencageURL);
 
@@ -199,8 +208,26 @@ MongoClient.connect(mongoDbConnectionString, function (error, currentClient) {
 
             console.log(reportsToLocalizeArray.length + " reports to localize");
 
-            reportsToLocalizeArray = reportsToLocalizeArray
-                .filter((reportToCkeck) => areReportTokensLessThan(10, reportToCkeck));
+            //reportsToLocalizeArray = reportsToLocalizeArray
+            //    .filter((reportToCkeck) => areReportTokensLessThan(10, reportToCkeck));
+
+            var refinedTitles = refineTitle(
+                reportsToLocalizeArray.map(report => report.TripName.replace(/[^a-zA-Z0-9]+/g, " ")).join(',')
+            ).split("\n");
+
+            
+
+            reportsToLocalizeArray = reportsToLocalizeArray.map((report, index) => {
+
+                report["extractedToponym"] = refinedTitles[index];
+
+                console.log(`refined ${report.TripName} to ${report.extractedToponym}`);
+
+                return report;
+                
+            }).filter(report =>{
+                return report.extractedToponym.length > 3;
+            });
 
             console.log(`Got ${reportsToLocalizeArray.length} reports to localize`);
 
