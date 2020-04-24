@@ -2,7 +2,7 @@ const MongoClient = require('mongodb').MongoClient;
 const https = require('https');
 const MyPromise = require("bluebird");
 
-const TitleRefinerHandler = require("./titleRefinerHandler");
+const TitleRefinerHandler = require("./titleRefinerHandler")("../nltk_experiment/", "get_toponym.py");
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 // needed because of winzozz error
 
@@ -40,16 +40,6 @@ const queryParameters = {
     limit: 5,
     skip: 0
 };
-
-function refineTitle(titleToRefine){
-    //var process = spawn('python3',["../nltk_experiment/get_toponym.py", titleToRefine]);
-    return childProcessLib.spawnSync('python3',["../nltk_experiment/get_toponym.py", titleToRefine], {cwd : "../nltk_experiment/", shell: true}).stdout.toString();
-    //return new Promise((resolve, reject) =>{
-    //    process.stdout.on("data", data =>{
-    //        resolve(data.toString()); // <------------ by default converts to utf-8
-    //    })
-    //})
-}
 
 function makeConnectionString(username, password, shards, database) {
     return `mongodb://${username}:${password}@${shards.join(',')}/${database}?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin`;

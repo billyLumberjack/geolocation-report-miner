@@ -1,10 +1,9 @@
-const childProcessLib = require("child_process");
+module.exports = function(pythonScriptFolder, pythonScriptName) {
 
-module.exports = {
-    synchRefineTitle : function(titleToRefine) {
+    const childProcessLib = require("child_process");
 
-        var pythonScriptFolder = "../nltk_experiment/";
-        var pythonScriptName = "get_toponym.py";
+    function synchRefineTitle (titleToRefine) {
+
         var pythonScriptPath = pythonScriptFolder + pythonScriptName;
         
         return childProcessLib.spawnSync(
@@ -16,4 +15,8 @@ module.exports = {
             })
             .stdout.toString();
     }
-}
+
+    return {
+        synchRefineTitle : synchRefineTitle
+    };
+};
