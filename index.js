@@ -1,7 +1,8 @@
 const MongoClient = require('mongodb').MongoClient;
 const https = require('https');
 const MyPromise = require("bluebird");
-const childProcessLib = require("child_process");
+
+const TitleRefinerHandler = require("./titleRefinerHandler");
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 // needed because of winzozz error
 
@@ -36,7 +37,7 @@ const queryParameters = {
         Date: -1,
         CreatedAt: -1
     },
-    limit: 100,
+    limit: 5,
     skip: 0
 };
 
@@ -211,7 +212,7 @@ MongoClient.connect(mongoDbConnectionString, function (error, currentClient) {
             //reportsToLocalizeArray = reportsToLocalizeArray
             //    .filter((reportToCkeck) => areReportTokensLessThan(10, reportToCkeck));
 
-            var refinedTitles = refineTitle(
+            var refinedTitles = TitleRefinerHandler.synchRefineTitle(
                 reportsToLocalizeArray.map(report => report.TripName.replace(/[^a-zA-Z0-9]+/g, " ")).join(',')
             ).split("\n");
 
