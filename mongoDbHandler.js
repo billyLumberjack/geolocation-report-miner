@@ -1,6 +1,10 @@
 module.exports = function(mongoDbClient , collectionName) {
 
-    const TitleRefinerHandler = require("./titleRefinerHandler")("../nltk_experiment/", "get_toponym.py");
+    const toponymScriptFolder = process.env.TOPONYM_SCRIPT_FOLDER;
+    const toponymScriptFilename = process.env.TOPONYM_SCRIPT_FILENAME;
+
+
+    const TitleRefinerHandler = require("./titleRefinerHandler")(toponymScriptFolder, toponymScriptFilename)//require("./titleRefinerHandler")("../nltk_experiment/", "get_toponym.py");
 
     const https = require('https');
 
