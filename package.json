@@ -16,6 +16,6 @@
   "dependencies": {
     "bluebird": "^3.7.2",
     "https": "*",
-    "mongodb": "^3.5.5"
+    "mongodb": "^3.5.6"
   }
 }
