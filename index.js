@@ -1,5 +1,7 @@
 const MongoClient = require('mongodb').MongoClient;
 const MongoDbHandlerFactory = require("./mongoDbHandler");
+const dotenv = require('dotenv');
+dotenv.config();
 
 const mongoDbConnectionString = (function createConnectionString(username, password, shards, databaseName) {
     var joinesShardsString = shards.join(',');
