@@ -14,6 +14,7 @@
   "license": "ISC",
   "homepage": "https://bitbucket.org/andreab91/geolocation-report-miner#readme",
   "dependencies": {
+    "dotenv": "^8.2.0",
     "https": "*",
     "mongodb": "^3.5.6"
   }
