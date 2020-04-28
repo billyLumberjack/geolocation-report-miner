@@ -2,7 +2,7 @@ module.exports = function(pythonScriptFolder, pythonScriptName) {
 
     const childProcessLib = require("child_process");
 
-    function synchRefineTitle (titleToRefine) {
+    function synchRefineFromTitlesArray (titleToRefine) {
 
         var pythonScriptPath = pythonScriptFolder + pythonScriptName;
         
@@ -17,6 +17,6 @@ module.exports = function(pythonScriptFolder, pythonScriptName) {
     }
 
     return {
-        synchRefineTitle : synchRefineTitle
+        synchRefineFromTitlesArray : synchRefineFromTitlesArray
     };
 };
