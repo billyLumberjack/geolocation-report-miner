@@ -3,7 +3,6 @@ module.exports = function(mongoDbClient , collectionName) {
     const TitleRefinerHandler = require("./titleRefinerHandler")("../nltk_experiment/", "get_toponym.py");
 
     const https = require('https');
-    const MyPromise = require("bluebird");
 
     const minimumToponymLength = 3;
     const openCageKeys = {
@@ -96,7 +95,7 @@ module.exports = function(mongoDbClient , collectionName) {
     }      
     
     function assignGeocodeBySearchTerms(reportToGeolocalize, searchTerms) {
-        return new MyPromise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
     
             var opencageURL = `https://api.opencagedata.com/geocode/v1/json?key=${openCageKeys.accountKey}&q=${searchTerms}&pretty=0&no_annotations=1&min_confidence=2`;
     
