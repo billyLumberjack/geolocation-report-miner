@@ -2,6 +2,7 @@ module.exports = function(mongoDbClient , collectionName) {
 
     const toponymScriptFolder = process.env.TOPONYM_SCRIPT_FOLDER;
     const toponymScriptFilename = process.env.TOPONYM_SCRIPT_FILENAME;
+    const geometryValueForFailures = "NOT_FOUND";
 
 
     const TitleRefinerHandler = require("./titleRefinerHandler")(toponymScriptFolder, toponymScriptFilename)//require("./titleRefinerHandler")("../nltk_experiment/", "get_toponym.py");
@@ -10,7 +11,7 @@ module.exports = function(mongoDbClient , collectionName) {
 
     const minimumToponymLength = 3;
     const openCageKeys = {
-        accountKey : "efb086e9e0884dc7a05179eb453bf2ab",
+        accountKey : "f0bf1d5dc8264c78b434fa5192ca420b",
         test : {
             always200 : "6d0e711d72d74daeb2b0bfd2a5cdfdba",
             always402 : "4372eff77b8343cebfc843eb4da4ddc4",
@@ -83,7 +84,9 @@ module.exports = function(mongoDbClient , collectionName) {
                 
                 if(localizedReport.geometry){
                     updateInMongoDb(localizedReport);
-                    updatedReportsNumber++;
+                    if(localizedReport.geometry != geometryValueForFailures){
+                        updatedReportsNumber++;
+                    }
                 }
                 else{
                     reportsNotLocalized.push(localizedReport);
@@ -146,17 +149,20 @@ module.exports = function(mongoDbClient , collectionName) {
                             }
                             else {
                                 console.log("Found result but does not have coordinates for report: " + reportToGeolocalize._id);
+                                reportToGeolocalize["geometry"] = geometryValueForFailures;
                                 resolve(reportToGeolocalize);
                             }
                         }
                         else {
                             console.log("None of the results for report: " + reportToGeolocalize._id + " fit the categories");
+                            reportToGeolocalize["geometry"] = geometryValueForFailures;
                             resolve(reportToGeolocalize);
                         }
     
                     }
                     else {
                         console.log("no results for report with _id: " + reportToGeolocalize._id + " while geolocalizing");
+                        reportToGeolocalize["geometry"] = geometryValueForFailures;
                         resolve(reportToGeolocalize);
                     }
     
