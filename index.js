@@ -32,7 +32,7 @@ MongoClient.connect(mongoDbConnectionString, function(error, mongoDbClient){
             Date: -1,
             CreatedAt: -1
         },
-        limit: 10,
+        limit: 100,
         skip: 0
     };
 

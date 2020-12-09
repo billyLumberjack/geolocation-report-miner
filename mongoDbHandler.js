@@ -11,7 +11,7 @@ module.exports = function(mongoDbClient , collectionName) {
 
     const minimumToponymLength = 3;
     const openCageKeys = {
-        accountKey : "f0bf1d5dc8264c78b434fa5192ca420b",
+        accountKey : "c61f098c79a6494ca56cc07cc83d4030",
         test : {
             always200 : "6d0e711d72d74daeb2b0bfd2a5cdfdba",
             always402 : "4372eff77b8343cebfc843eb4da4ddc4",
