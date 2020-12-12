@@ -36,10 +36,12 @@ module.exports = function(mongoDbClient , collectionName) {
     
                 console.log(`${reportsToLocalizeArray.length} reports to localize`);
 
-                reportsToLocalizeArray = reportsToLocalizeArray.map((reportWithoutCleanTripName) => {
-                    reportWithoutCleanTripName["cleanTitle"] = reportWithoutCleanTripName.TripName.replace(/[^a-zA-Z0-9]+/g, " ");
-                    return reportWithoutCleanTripName;
-                });
+                reportsToLocalizeArray = reportsToLocalizeArray
+                                            .filter(reportWithoutCleanTripName => reportWithoutCleanTripName.TripName.length > minimumToponymLength)
+                                            .map((reportWithoutCleanTripName) => {
+                                                reportWithoutCleanTripName["cleanTitle"] = reportWithoutCleanTripName.TripName.replace(/[^a-zA-Z0-9]+/g, " ");
+                                                return reportWithoutCleanTripName;
+                                            });
     
                 var refinedTitles = TitleRefinerHandler.synchRefineFromTitlesArray(
                     reportsToLocalizeArray
