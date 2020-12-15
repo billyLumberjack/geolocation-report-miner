@@ -1,3 +1,16 @@
+const dotenv = require('dotenv');
+const CwLogsHelper = require('./lib/cw-logs-helper');
+
+dotenv.config();
+process.chdir(__dirname);
+
+const aws_config = {
+	accessKeyId: process.env.ACCESS_KEY_ID,
+	secretAccessKey: process.env.SECRET_ACCESS_KEY,
+	region: process.env.REGION
+};
+const cwLogsHelper = new CwLogsHelper("GEOLOCATION_REPORT_MINER", "GRM", aws_config);
+
 module.exports = function(mongoDbClient , collectionName) {
 
     const toponymScriptFolder = process.env.TOPONYM_SCRIPT_FOLDER;
@@ -34,7 +47,7 @@ module.exports = function(mongoDbClient , collectionName) {
     
                 if (error) throw error;
     
-                console.log(`${reportsToLocalizeArray.length} reports to localize`);
+                cwLogsHelper.write(`${reportsToLocalizeArray.length} reports to localize`);
 
                 reportsToLocalizeArray = reportsToLocalizeArray
                                             .filter(reportWithoutCleanTripName => reportWithoutCleanTripName.TripName.length > minimumToponymLength)
@@ -52,12 +65,12 @@ module.exports = function(mongoDbClient , collectionName) {
                 reportsToLocalizeArray = reportsToLocalizeArray.map((reportWithoutExtractedToponym, index) => {
     
                     reportWithoutExtractedToponym["extractedToponym"] = refinedTitles[index];
-                    console.log(`added ${reportWithoutExtractedToponym.extractedToponym} to report object with title ${reportWithoutExtractedToponym.TripName}`);
+                    cwLogsHelper.write(`added ${reportWithoutExtractedToponym.extractedToponym} to report object with title ${reportWithoutExtractedToponym.TripName}`);
                     return reportWithoutExtractedToponym;
                     
                 });
     
-                console.log(`Got ${reportsToLocalizeArray.length} reports to localize`);
+                cwLogsHelper.write(`Got ${reportsToLocalizeArray.length} reports to localize`);
     
                 updateInMongoDbAsQueue(reportsToLocalizeArray, [], 0, reportsToLocalizeArray.length);
     
@@ -67,7 +80,7 @@ module.exports = function(mongoDbClient , collectionName) {
     function updateInMongoDbAsQueue (reportsToLocalizeArray, reportsNotLocalized, updatedReportsNumber, totalReportsToUpdate){
 
         if(reportsToLocalizeArray.length == 0){
-            console.log(`\nUpdated ${updatedReportsNumber} reports on ${totalReportsToUpdate}\n`);
+            cwLogsHelper.write(`\nUpdated ${updatedReportsNumber} reports on ${totalReportsToUpdate}\n`);
             mongoDbClient.close();
             return;
         }
@@ -120,7 +133,7 @@ module.exports = function(mongoDbClient , collectionName) {
                 });
     
                 response.on('end', () => {
-                    console.log(`Succesfully CALLED: ${opencageURL}`);
+                    cwLogsHelper.write(`Succesfully CALLED: ${opencageURL}`);
     
                     //create the object from the html page
                     var location_results = JSON.parse(body);
@@ -132,7 +145,7 @@ module.exports = function(mongoDbClient , collectionName) {
                     }
                     else if (location_results.total_results > 0) {
     
-                        console.log("Found some result for report " + reportToGeolocalize["_id"]);
+                        cwLogsHelper.write("Found some result for report " + reportToGeolocalize["_id"]);
     
                         let locationResult = getFirstLocationResultFittingCategories(location_results.results);
     
@@ -146,24 +159,24 @@ module.exports = function(mongoDbClient , collectionName) {
                                         locationResult.geometry.lng
                                     ]
                                 };
-                                console.log("Succesfully added coordinates for report " + reportToGeolocalize["_id"]);
+                                cwLogsHelper.write("Succesfully added coordinates for report " + reportToGeolocalize["_id"]);
                                 resolve(reportToGeolocalize);
                             }
                             else {
-                                console.log("Found result but does not have coordinates for report: " + reportToGeolocalize._id);
+                                cwLogsHelper.write("Found result but does not have coordinates for report: " + reportToGeolocalize._id);
                                 reportToGeolocalize["geometry"] = geometryValueForFailures;
                                 resolve(reportToGeolocalize);
                             }
                         }
                         else {
-                            console.log("None of the results for report: " + reportToGeolocalize._id + " fit the categories");
+                            cwLogsHelper.write("None of the results for report: " + reportToGeolocalize._id + " fit the categories");
                             reportToGeolocalize["geometry"] = geometryValueForFailures;
                             resolve(reportToGeolocalize);
                         }
     
                     }
                     else {
-                        console.log("no results for report with _id: " + reportToGeolocalize._id + " while geolocalizing");
+                        cwLogsHelper.write("no results for report with _id: " + reportToGeolocalize._id + " while geolocalizing");
                         reportToGeolocalize["geometry"] = geometryValueForFailures;
                         resolve(reportToGeolocalize);
                     }
@@ -198,7 +211,7 @@ module.exports = function(mongoDbClient , collectionName) {
                     
                     if (err) throw err;
     
-                    console.log(`${localizedReport._id} succesfully updated`);
+                    cwLogsHelper.write(`${localizedReport._id} succesfully updated`);
                 }
             );
     }

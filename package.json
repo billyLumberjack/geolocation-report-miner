@@ -16,6 +16,8 @@
   "dependencies": {
     "dotenv": "^8.2.0",
     "https": "*",
-    "mongodb": "^3.5.6"
+    "mongodb": "^3.5.6",
+    "aws-sdk": "2.116.0",
+    "cwlogs-writable": "1.0.0"
   }
 }
