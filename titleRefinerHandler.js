@@ -1,18 +1,13 @@
-module.exports = function(pythonScriptFolder, pythonScriptName) {
+module.exports = function(executable) {
 
     const childProcessLib = require("child_process");
 
     function synchRefineFromTitlesArray (titleToRefine) {
-
-        var pythonScriptPath = pythonScriptFolder + pythonScriptName;
-        
+       
         return childProcessLib.spawnSync(
-            'python3',
-            [pythonScriptPath, titleToRefine], 
-            {
-                cwd : pythonScriptFolder,
-                shell: true
-            })
+            executable,
+            [titleToRefine]
+	    )
             .stdout.toString();
     }
 

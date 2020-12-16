@@ -13,12 +13,10 @@ const cwLogsHelper = new CwLogsHelper("GEOLOCATION_REPORT_MINER", "GRM", aws_con
 
 module.exports = function(mongoDbClient , collectionName) {
 
-    const toponymScriptFolder = process.env.TOPONYM_SCRIPT_FOLDER;
-    const toponymScriptFilename = process.env.TOPONYM_SCRIPT_FILENAME;
+    const toponymExecutablePath = process.env.TOPONYM_SCRIPT_PATH;
     const geometryValueForFailures = "NOT_FOUND";
 
-
-    const TitleRefinerHandler = require("./titleRefinerHandler")(toponymScriptFolder, toponymScriptFilename)//require("./titleRefinerHandler")("../nltk_experiment/", "get_toponym.py");
+    const TitleRefinerHandler = require("./titleRefinerHandler")(toponymExecutablePath)
 
     const https = require('https');
 
