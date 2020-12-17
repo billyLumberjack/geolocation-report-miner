@@ -2,3 +2,7 @@ node_modules
 .idea/
 .env
 package-lock.json
+get_toponym
+log.log
+sorted_target_pos_sequences.txt
+treetagger/
