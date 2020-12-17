@@ -78,7 +78,7 @@ module.exports = function(mongoDbClient , collectionName) {
     function updateInMongoDbAsQueue (reportsToLocalizeArray, reportsNotLocalized, updatedReportsNumber, totalReportsToUpdate){
 
         if(reportsToLocalizeArray.length == 0){
-            cwLogsHelper.write(`\nUpdated ${updatedReportsNumber} reports on ${totalReportsToUpdate}\n`);
+            cwLogsHelper.write(`Updated ${updatedReportsNumber} reports on ${totalReportsToUpdate}`);
             mongoDbClient.close();
             return;
         }
@@ -109,7 +109,7 @@ module.exports = function(mongoDbClient , collectionName) {
             })
             .catch((error) => {
                 mongoDbClient.close();
-                console.error(`\n${error.message}\n`);
+                cwLogsHelper.write(`${error.message}`);
                 return;
             });
     }      
